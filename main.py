@@ -1,4 +1,5 @@
 import gym
-import bomber_env.bomber_env
+import bomber_env
 
 env = gym.make('bomber-v0')
+env.render()
