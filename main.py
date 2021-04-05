@@ -96,7 +96,7 @@ def optimize_model():
     optimizer.step()
 
 
-num_random = 5000
+num_random = 10000
 for i in range(num_random):
     strat = RandomStrategy()
     env.reset()
@@ -111,29 +111,8 @@ for i in range(num_random):
         if done:
             break
 
-# for j in range(1000):
-#     optimize_model()
-
-num_episodes = 100
-for i_episode in range(num_episodes):
-    print(i_episode)
-    env.reset()
-    state, _, _, _ = env.step(0)
-    for t in count():
-        action = select_action(state)
-
-        next_state, reward, done, _ = env.step(action.item())
-        if reward != 0:
-            print(f"REWARD {reward}")
-        reward = T.tensor([reward])
-        memory.push(state, action, next_state, reward)
-
-        state = next_state
-        for i in range(10):
-            optimize_model()
-        # target_net.load_state_dict(policy_net.state_dict())
-        if done:
-            break
+for j in range(5000):
+    optimize_model()
 
 for i in range(10):
     env.reset()
