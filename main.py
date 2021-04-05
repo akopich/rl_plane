@@ -16,6 +16,7 @@ from play import play
 
 T.set_default_tensor_type(T.DoubleTensor)
 
+
 class DQN(nn.Module):
     def __init__(self, hidden_width):
         super(DQN, self).__init__()
@@ -30,7 +31,7 @@ class DQN(nn.Module):
         return x
 
 
-BATCH_SIZE = 512
+BATCH_SIZE = 1024
 GAMMA = 0.99999999
 EPS_START = 0.9
 EPS_END = 0.00
@@ -38,20 +39,21 @@ EPS_DECAY = 200
 TARGET_UPDATE = 10
 HIDDEN_N = 6
 
-policy_net = nn.Sequential(
-          nn.Linear(3, HIDDEN_N),
-          nn.ReLU(),
-          nn.Linear(HIDDEN_N, HIDDEN_N),
-          nn.ReLU(),
-          nn.Linear(HIDDEN_N, 2)
-        )
+policy_net = nn.Sequential(nn.Linear(3, HIDDEN_N),
+                           nn.ReLU(),
+                           nn.Linear(HIDDEN_N, HIDDEN_N),
+                           nn.ReLU(),
+                           nn.Linear(HIDDEN_N, HIDDEN_N),
+                           nn.ReLU(),
+                           nn.Linear(HIDDEN_N, 2)
+                           )
 
 #DQN(HIDDEN_N)
 # target_net = DQN(HIDDEN_N)
 # target_net.load_state_dict(policy_net.state_dict())
 # target_net.eval()
 
-optimizer = optim.Adam(policy_net.parameters(), lr=1e-3)
+optimizer = optim.Adam(policy_net.parameters(), lr=1e-3/3)
 memoryPositive = ReplayMemory(10000, lambda tr: tr.reward > 0)
 memoryNegative = ReplayMemory(10000, lambda tr: tr.reward < 0)
 memoryZero = ReplayMemory(10000, lambda tr: tr.reward == 0)
