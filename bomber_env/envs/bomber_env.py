@@ -20,11 +20,14 @@ class BomberEnv(gym.Env):
         if action == 1:
             point_of_impact = self.plane_location + np.sqrt(2 * self.alt / self.g) * self.plane_speed
             distance = np.abs(point_of_impact - self.target_location)
-            reward = 1/(distance/10 + 1)
+            if distance < 1000:
+                reward = 1.
+            else:
+                reward = -1.
             return None, reward, True, {}
         self.plane_location += self.dt * self.plane_speed
         if self.plane_location > self.target_location:
-            return None, -10., True, {}
+            return None, -1., True, {}
 
         distance_to_target = self.target_location - self.plane_location
         observation = T.tensor([distance_to_target, self.alt, self.plane_speed])

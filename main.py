@@ -9,7 +9,8 @@ import random
 import torch as T
 import numpy as np
 
-from bomber_env.ReplayMemory import ReplayMemory, Transition
+from RandomStrategy import RandomStrategy
+from bomber_env.ReplayMemory import ReplayMemory, Transition, MergedMemory
 from play import play
 
 
@@ -29,21 +30,33 @@ class DQN(nn.Module):
         return x
 
 
-BATCH_SIZE = 128
-GAMMA = 0.999
+BATCH_SIZE = 512
+GAMMA = 0.99999999
 EPS_START = 0.9
 EPS_END = 0.00
 EPS_DECAY = 200
 TARGET_UPDATE = 10
-HIDDEN_N = 10
+HIDDEN_N = 6
 
-policy_net = DQN(HIDDEN_N)
-target_net = DQN(HIDDEN_N)
-target_net.load_state_dict(policy_net.state_dict())
-target_net.eval()
+policy_net = nn.Sequential(
+          nn.Linear(3, HIDDEN_N),
+          nn.ReLU(),
+          nn.Linear(HIDDEN_N, HIDDEN_N),
+          nn.ReLU(),
+          nn.Linear(HIDDEN_N, 2)
+        )
 
-optimizer = optim.RMSprop(policy_net.parameters(), lr=1e-2)
-memory = ReplayMemory(10000)
+#DQN(HIDDEN_N)
+# target_net = DQN(HIDDEN_N)
+# target_net.load_state_dict(policy_net.state_dict())
+# target_net.eval()
+
+optimizer = optim.Adam(policy_net.parameters(), lr=1e-3)
+memoryPositive = ReplayMemory(10000, lambda tr: tr.reward > 0)
+memoryNegative = ReplayMemory(10000, lambda tr: tr.reward < 0)
+memoryZero = ReplayMemory(10000, lambda tr: tr.reward == 0)
+
+memory = MergedMemory([memoryNegative, memoryPositive, memoryZero])
 
 env = gym.make('bomber-v0')
 
@@ -55,7 +68,7 @@ def select_action(state):
 
 
 def optimize_model():
-    if len(memory) < BATCH_SIZE:
+    if len(memoryPositive) < 100:
         return
     transitions = memory.sample(BATCH_SIZE)
     batch = Transition(*zip(*transitions))
@@ -70,11 +83,11 @@ def optimize_model():
     state_action_values = policy_net(state_batch).gather(1, action_batch)
 
     next_state_values = T.zeros(BATCH_SIZE)
-    next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0].detach()
+    next_state_values[non_final_mask] = policy_net(non_final_next_states).max(1)[0].detach()
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch.reshape(-1)
 
-    loss = F.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1))
-
+    loss = F.mse_loss(state_action_values, expected_state_action_values.unsqueeze(1))
+    print(loss.item())
     # Optimize the model
     optimizer.zero_grad()
     loss.backward()
@@ -83,13 +96,32 @@ def optimize_model():
     optimizer.step()
 
 
-num_episodes = 500
+num_random = 5000
+for i in range(num_random):
+    strat = RandomStrategy()
+    env.reset()
+    state, _, _, _ = env.step(0)
+    for t in count():
+        action = T.tensor([strat(state)])
+        next_state, reward, done, _ = env.step(action.item())
+        reward = T.tensor([reward])
+        memory.push(state, action, next_state, reward)
+
+        state = next_state
+        if done:
+            break
+
+# for j in range(1000):
+#     optimize_model()
+
+num_episodes = 100
 for i_episode in range(num_episodes):
     print(i_episode)
     env.reset()
     state, _, _, _ = env.step(0)
     for t in count():
         action = select_action(state)
+
         next_state, reward, done, _ = env.step(action.item())
         if reward != 0:
             print(f"REWARD {reward}")
@@ -97,15 +129,12 @@ for i_episode in range(num_episodes):
         memory.push(state, action, next_state, reward)
 
         state = next_state
-
-        optimize_model()
+        for i in range(10):
+            optimize_model()
+        # target_net.load_state_dict(policy_net.state_dict())
         if done:
             break
-    if i_episode % TARGET_UPDATE == 0:
-        target_net.load_state_dict(policy_net.state_dict())
 
-
-print([transitino.reward for transitino in memory.memory if transitino.reward > 0])
 for i in range(10):
     env.reset()
-    play(env, target_net)
+    play(env, policy_net)

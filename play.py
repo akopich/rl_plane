@@ -8,5 +8,5 @@ def play(env, net):
     while not end:
         action = net(obs).argmax()
         obs, reward, end, _ = env.step(action)
-        env.render()
+    env.render()
     print(reward)
