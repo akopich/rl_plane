@@ -23,20 +23,6 @@ def net2strat(net: nn.Module) -> Strategy:
     return lambda obs: net(obs).argmax()
 
 
-class DQN(nn.Module):
-    def __init__(self, hidden_width):
-        super(DQN, self).__init__()
-        self.fc1 = nn.Linear(3, hidden_width)
-        self.fc2 = nn.Linear(hidden_width, 2)
-        self.dropout = nn.Dropout(p=0.5)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
-        return x
-
-
 BATCH_SIZE = 1024
 GAMMA = 0.99999999
 EPS_START = 0.9
