@@ -1,7 +1,7 @@
 from itertools import count
 
 import gym
-from torch import optim
+import logging
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,6 +14,9 @@ from bomber_env.Memory import ReplayMemory, Transition, MergedMemory
 from play import play, Strategy
 
 T.set_default_tensor_type(T.DoubleTensor)
+
+
+logging.root.setLevel(logging.DEBUG)
 
 
 def net2strat(net: nn.Module) -> Strategy:
@@ -56,7 +59,7 @@ policy_net = nn.Sequential(nn.Linear(3, HIDDEN_N),
 # target_net.load_state_dict(policy_net.state_dict())
 # target_net.eval()
 
-optimizer = optim.Adam(policy_net.parameters(), lr=1e-4)
+optimizer = T.optim.Adam(policy_net.parameters(), lr=1e-4)
 memoryPositive = ReplayMemory(10000, lambda tr: tr.reward > 0)
 memoryNegative = ReplayMemory(10000, lambda tr: tr.reward < 0)
 memoryZero = ReplayMemory(10000, lambda tr: tr.reward == 0)
@@ -92,7 +95,7 @@ def optimize_model():
     expected_state_action_Q = (next_state_Q * GAMMA) + reward_batch.reshape(-1)
 
     loss = F.mse_loss(state_action_Q, expected_state_action_Q.unsqueeze(1))
-    print(loss.item())
+    logging.debug(f"Q-training loss: {loss.item()}")
     # Optimize the model
     optimizer.zero_grad()
     loss.backward()
@@ -104,12 +107,10 @@ def optimize_model():
 num_random = 10000
 for i in range(num_random):
     strat = RandomStrategy()
-    env.reset()
     play(env, strat, memory)
 
 for j in range(5000):
     optimize_model()
 
-for i in range(10):
-    env.reset()
-    play(env, net2strat(policy_net), None, log=True)
+
+print(np.array([play(env, net2strat(policy_net)) for i in range(100)]).mean())

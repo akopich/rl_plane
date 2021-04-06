@@ -3,6 +3,7 @@ from typing import Callable
 from gym import Env
 
 import torch as T
+import logging
 
 from bomber_env.Memory import Transition, Memory
 
@@ -10,6 +11,7 @@ Strategy = Callable[[T.Tensor], int]
 
 
 def play(env: Env, strategy: Strategy, memory: Memory = None, log=False) -> float:
+    env.reset()
     obs, reward, end, _ = env.step(0)
     while not end:
         action = strategy(obs)
@@ -19,5 +21,5 @@ def play(env: Env, strategy: Strategy, memory: Memory = None, log=False) -> floa
         obs = next_obs
     if log:
         env.render()
-        print(reward)
+        logging.info(f"played with reward: {reward}")
     return reward
