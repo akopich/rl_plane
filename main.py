@@ -54,11 +54,6 @@ policy_net = nn.Sequential(nn.Linear(3, HIDDEN_N),
                            nn.Linear(HIDDEN_N, 2)
                            )
 
-#DQN(HIDDEN_N)
-# target_net = DQN(HIDDEN_N)
-# target_net.load_state_dict(policy_net.state_dict())
-# target_net.eval()
-
 optimizer = T.optim.Adam(policy_net.parameters(), lr=1e-4)
 memoryPositive = ReplayMemory(10000, lambda tr: tr.reward > 0)
 memoryNegative = ReplayMemory(10000, lambda tr: tr.reward < 0)
@@ -67,12 +62,6 @@ memoryZero = ReplayMemory(10000, lambda tr: tr.reward == 0)
 memory = MergedMemory([memoryNegative, memoryPositive, memoryZero])
 
 env = gym.make('bomber-v0')
-
-steps_done = 0
-
-
-def select_action(state):
-    return policy_net(state).argmax()
 
 
 def optimize_model():
@@ -104,13 +93,13 @@ def optimize_model():
     optimizer.step()
 
 
-num_random = 10000
+num_random = 50000
 for i in range(num_random):
     strat = RandomStrategy()
     play(env, strat, memory)
 
-for j in range(5000):
+for j in range(10000):
     optimize_model()
 
 
-print(np.array([play(env, net2strat(policy_net)) for i in range(100)]).mean())
+print(np.array([play(env, net2strat(policy_net), log=True) for i in range(100)]).mean())

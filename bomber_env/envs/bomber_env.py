@@ -38,9 +38,10 @@ class BomberEnv(gym.Env):
         self.g = 9.8
         self.target_location = uniform(low=5000., high=15000.)
         self.plane_location = 0.
-        self.plane_speed = 222.
+        self.plane_speed = uniform(low=100, high=250)
         self.alt = 1000
         self.dt = 1
 
     def render(self, mode='human'):
-        print(f"target_location={self.target_location}, plane_location={self.plane_location}")
+        print(f"target_location={self.target_location}, plane_location={self.plane_location}, speed={self.plane_speed}, "
+              f"CCIP: {self.plane_location + np.sqrt(2 * self.alt / self.g) * self.plane_speed}")
