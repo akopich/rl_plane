@@ -11,10 +11,13 @@ import numpy as np
 
 from RandomStrategy import RandomStrategy
 from bomber_env.ReplayMemory import ReplayMemory, Transition, MergedMemory
-from play import play
-
+from play import play, Strategy
 
 T.set_default_tensor_type(T.DoubleTensor)
+
+
+def net2strat(net: nn.Module) -> Strategy:
+    return lambda obs: net(obs).argmax()
 
 
 class DQN(nn.Module):
@@ -53,7 +56,7 @@ policy_net = nn.Sequential(nn.Linear(3, HIDDEN_N),
 # target_net.load_state_dict(policy_net.state_dict())
 # target_net.eval()
 
-optimizer = optim.Adam(policy_net.parameters(), lr=1e-3/3)
+optimizer = optim.Adam(policy_net.parameters(), lr=1e-4)
 memoryPositive = ReplayMemory(10000, lambda tr: tr.reward > 0)
 memoryNegative = ReplayMemory(10000, lambda tr: tr.reward < 0)
 memoryZero = ReplayMemory(10000, lambda tr: tr.reward == 0)
@@ -82,13 +85,13 @@ def optimize_model():
     reward_batch = T.vstack(batch.reward)
 
     # Compute Q(s_t, a)
-    state_action_values = policy_net(state_batch).gather(1, action_batch)
+    state_action_Q = policy_net(state_batch).gather(1, action_batch)
 
-    next_state_values = T.zeros(BATCH_SIZE)
-    next_state_values[non_final_mask] = policy_net(non_final_next_states).max(1)[0].detach()
-    expected_state_action_values = (next_state_values * GAMMA) + reward_batch.reshape(-1)
+    next_state_Q = T.zeros(BATCH_SIZE)
+    next_state_Q[non_final_mask] = policy_net(non_final_next_states).max(1)[0].detach()
+    expected_state_action_Q = (next_state_Q * GAMMA) + reward_batch.reshape(-1)
 
-    loss = F.mse_loss(state_action_values, expected_state_action_values.unsqueeze(1))
+    loss = F.mse_loss(state_action_Q, expected_state_action_Q.unsqueeze(1))
     print(loss.item())
     # Optimize the model
     optimizer.zero_grad()
@@ -102,20 +105,11 @@ num_random = 10000
 for i in range(num_random):
     strat = RandomStrategy()
     env.reset()
-    state, _, _, _ = env.step(0)
-    for t in count():
-        action = T.tensor([strat(state)])
-        next_state, reward, done, _ = env.step(action.item())
-        reward = T.tensor([reward])
-        memory.push(state, action, next_state, reward)
-
-        state = next_state
-        if done:
-            break
+    play(env, strat, memory)
 
 for j in range(5000):
     optimize_model()
 
 for i in range(10):
     env.reset()
-    play(env, policy_net)
+    play(env, net2strat(policy_net), None, log=True)

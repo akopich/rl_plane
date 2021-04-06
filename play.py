@@ -1,12 +1,23 @@
-from itertools import count
+from typing import Callable
+
+from gym import Env
 
 import torch as T
 
+from bomber_env.ReplayMemory import Transition
 
-def play(env, net):
+Strategy = Callable[[T.Tensor], int]
+
+
+def play(env: Env, strategy: Strategy, memory: None, log=False) -> float:
     obs, reward, end, _ = env.step(0)
     while not end:
-        action = net(obs).argmax()
-        obs, reward, end, _ = env.step(action)
-    env.render()
-    print(reward)
+        action = strategy(obs)
+        next_obs, reward, end, _ = env.step(action)
+        if memory is not None:
+            memory.push(Transition(obs, T.tensor([action]), next_obs, T.tensor([reward])))
+        obs = next_obs
+    if log:
+        env.render()
+        print(reward)
+    return reward

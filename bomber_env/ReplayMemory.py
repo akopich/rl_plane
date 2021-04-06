@@ -1,12 +1,17 @@
 from collections import namedtuple
 import random
 from itertools import chain
+from typing import NamedTuple
 
 import torch as T
 import numpy as np
 
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
+
+class Transition(NamedTuple):
+    state: T.Tensor
+    action: T.Tensor
+    next_state: T.Tensor
+    reward: T.Tensor
 
 
 class ReplayMemory:
@@ -19,13 +24,12 @@ class ReplayMemory:
     def positive(self):
         return T.tensor([transition.reward > 0 for transition in self.memory]).float().sum()
 
-    def push(self, *args):
-        tr = Transition(*args)
-        if not self.predicate(tr):
+    def push(self, transition: Transition):
+        if not self.predicate(transition):
             return
         if len(self.memory) < self.capacity:
             self.memory.append(None)
-        self.memory[self.position] = tr
+        self.memory[self.position] = transition
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
@@ -43,9 +47,9 @@ class MergedMemory:
     def positive(self):
         return T.tensor([mem.positive() for mem in self.memories]).sum()
 
-    def push(self, *args):
+    def push(self, tr):
         for mem in self.memories:
-            mem.push(*args)
+            mem.push(tr)
 
     def sample(self, batch_size):
         single_size = int(batch_size / len(self.memories))

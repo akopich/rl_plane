@@ -1,6 +1,8 @@
 import torch as T
 from numpy.random import uniform
 
+from play import Strategy
+
 
 class RandomStrategy:
     def __init__(self):
