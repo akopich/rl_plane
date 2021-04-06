@@ -1,7 +1,7 @@
 from collections import namedtuple
 import random
 from itertools import chain
-from typing import NamedTuple
+from typing import NamedTuple, Protocol
 
 import torch as T
 import numpy as np
@@ -14,7 +14,21 @@ class Transition(NamedTuple):
     reward: T.Tensor
 
 
-class ReplayMemory:
+class Memory(Protocol):
+    def positive(self):
+        raise NotImplementedError()
+
+    def push(self, transition: Transition):
+        raise NotImplementedError()
+
+    def sample(self, batch_size: int):
+        raise NotImplementedError()
+
+    def __len__(self) -> int:
+        raise NotImplementedError()
+
+
+class ReplayMemory(Memory):
     def __init__(self, capacity, predicate=lambda x: True):
         self.capacity = capacity
         self.predicate = predicate
@@ -40,7 +54,7 @@ class ReplayMemory:
         return len(self.memory)
 
 
-class MergedMemory:
+class MergedMemory(Memory):
     def __init__(self, memories):
         self.memories = memories
 
