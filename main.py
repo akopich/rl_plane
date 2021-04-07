@@ -13,7 +13,7 @@ from RandomStrategy import RandomStrategy
 from bomber_env.Memory import ReplayMemory, Transition, MergedMemory
 from play import play, Strategy
 
-T.set_default_tensor_type(T.DoubleTensor)
+T.set_default_tensor_type(T.FloatTensor)
 
 
 logging.root.setLevel(logging.DEBUG)
@@ -53,25 +53,17 @@ env = gym.make('bomber-v0')
 def optimize_model():
     if len(memoryPositive) < 100:
         return
-    transitions = memory.sample(BATCH_SIZE)
-    batch = Transition(*zip(*transitions))
+    state, reward, action, has_next, next_state = memory.sample(BATCH_SIZE)
 
-    non_final_mask = T.tensor(tuple(map(lambda s: s is not None, batch.next_state)), dtype=T.bool)
-    non_final_next_states = T.vstack([next_state for next_state in batch.next_state if next_state is not None])
-    state_batch = T.vstack(batch.state)
-    action_batch = T.vstack(batch.action)
-    reward_batch = T.vstack(batch.reward)
-
-    # Compute Q(s_t, a)
-    state_action_Q = policy_net(state_batch).gather(1, action_batch)
+    state_action_Q = policy_net(state).gather(1, action)
 
     next_state_Q = T.zeros(BATCH_SIZE)
-    next_state_Q[non_final_mask] = policy_net(non_final_next_states).max(1)[0].detach()
-    expected_state_action_Q = (next_state_Q * GAMMA) + reward_batch.reshape(-1)
+    next_state_Q[has_next] = policy_net(next_state[has_next]).max(1)[0].detach()
+    expected_state_action_Q = (next_state_Q * GAMMA) + reward
 
     loss = F.mse_loss(state_action_Q, expected_state_action_Q.unsqueeze(1))
     logging.debug(f"Q-training loss: {loss.item()}")
-    # Optimize the model
+
     optimizer.zero_grad()
     loss.backward()
     for param in policy_net.parameters():
