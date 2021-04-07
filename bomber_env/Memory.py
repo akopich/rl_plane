@@ -49,6 +49,9 @@ class Memory(Protocol):
     def push(self, transition: Transition):
         raise NotImplementedError()
 
+    def get(self) -> TransitionHistory:
+        raise NotImplementedError()
+
     def sample(self, batch_size: int) -> TransitionHistory:
         raise NotImplementedError()
 
@@ -84,7 +87,12 @@ class ReplayMemory(Memory):
     def sample(self, batch_size) -> TransitionHistory:
         n = self.capacity if self.counter >= self.capacity else self.counter
         indx = T.randint(n, (batch_size,))
+        return self.__get_by_index(indx)
 
+    def get(self) -> TransitionHistory:
+        return self.__get_by_index(T.tensor(range(len(self))))
+
+    def __get_by_index(self, indx: T.Tensor) -> TransitionHistory:
         return TransitionHistory(self.state[indx, :],
                                  self.reward[indx],
                                  self.action[indx, :],
@@ -98,6 +106,11 @@ class ReplayMemory(Memory):
 class MergedMemory(Memory):
     def __init__(self, memories):
         self.memories = memories
+
+    def get(self) -> TransitionHistory:
+        samples = [list(iter(mem.get())) for mem in self.memories]
+
+        return TransitionHistory(*[T.cat([sample[i] for sample in samples], 0) for i in range(5)])
 
     def push(self, tr):
         for mem in self.memories:
