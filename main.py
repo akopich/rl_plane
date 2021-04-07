@@ -56,7 +56,6 @@ def optimize_model():
     state, reward, action, has_next, next_state = memory.sample(BATCH_SIZE)
 
     state_action_Q = policy_net(state).gather(1, action)
-
     next_state_Q = T.zeros(BATCH_SIZE)
     next_state_Q[has_next] = policy_net(next_state[has_next]).max(1)[0].detach()
     expected_state_action_Q = (next_state_Q * GAMMA) + reward

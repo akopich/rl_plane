@@ -1,5 +1,6 @@
 from collections import namedtuple
 import random
+from dataclasses import dataclass
 from itertools import chain
 from typing import NamedTuple, Protocol, Optional
 
@@ -10,7 +11,20 @@ STATE_WIDTH = 3
 ACTION_WIDTH = 1
 
 
-class Transition(NamedTuple):
+@dataclass(frozen=True)
+class TransitionHistory:
+    state: T.Tensor
+    reward: T.Tensor
+    action: T.Tensor
+    has_next: T.BoolTensor
+    next_state: T.Tensor
+
+    def __iter__(self):
+        return iter((self.state, self.reward, self.action, self.has_next, self.next_state))
+
+
+@dataclass(frozen=True)
+class Transition:
     state: T.Tensor
     action: T.Tensor
     next_state: Optional[T.Tensor]
@@ -35,7 +49,7 @@ class Memory(Protocol):
     def push(self, transition: Transition):
         raise NotImplementedError()
 
-    def sample(self, batch_size: int):
+    def sample(self, batch_size: int) -> TransitionHistory:
         raise NotImplementedError()
 
     def __len__(self) -> int:
@@ -67,12 +81,15 @@ class ReplayMemory(Memory):
             self.has_next_state[index] = False
         self.counter += 1
 
-    def sample(self, batch_size):
+    def sample(self, batch_size) -> TransitionHistory:
         n = self.capacity if self.counter >= self.capacity else self.counter
         indx = T.randint(n, (batch_size,))
 
-        return self.state[indx, :], self.reward[indx], self.action[indx, :], \
-               self.has_next_state[indx], self.next_state[indx, :]
+        return TransitionHistory(self.state[indx, :],
+                                 self.reward[indx],
+                                 self.action[indx, :],
+                                 self.has_next_state[indx],
+                                 self.next_state[indx, :])
 
     def __len__(self):
         return self.capacity if self.counter >= self.capacity else self.counter
@@ -86,14 +103,14 @@ class MergedMemory(Memory):
         for mem in self.memories:
             mem.push(tr)
 
-    def sample(self, batch_size):
+    def sample(self, batch_size) -> TransitionHistory:
         single_size = int(batch_size / len(self.memories))
         last_size = batch_size - single_size * (len(self.memories) - 1)
         sizes = [single_size] * (len(self.memories) - 1) + [last_size]
 
-        samples = [mem.sample(size) for mem, size in zip(self.memories, sizes)]
+        samples = [list(iter(mem.sample(size))) for mem, size in zip(self.memories, sizes)]
 
-        return tuple([T.cat([sample[i] for sample in samples], 0) for i in range(5)])
+        return TransitionHistory(*[T.cat([sample[i] for sample in samples], 0) for i in range(5)])
 
     def __len__(self):
         return min([len(mem) for mem in self.memories])

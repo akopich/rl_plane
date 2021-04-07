@@ -15,11 +15,11 @@ class MemoryTest(unittest.TestCase):
         memory.push(to_be_pushed_out)
         for tr in transitions:
             memory.push(tr)
-        state, reward, action, has_next_state, next_state = memory.sample(30)
+        smpl = memory.sample(30)
 
-        for i in range(state.size()[0]):
-            ns = next_state[i, :] if has_next_state[i] else None
-            tr = Transition(state[i, :], action[i, :], ns, reward[i])
+        for i in range(smpl.state.size()[0]):
+            ns = smpl.next_state[i, :] if smpl.has_next[i] else None
+            tr = Transition(smpl.state[i, :], smpl.action[i, :], ns, smpl.reward[i])
             self.assertTrue(tr != to_be_pushed_out)
             self.assertTrue(tr in transitions)
 
