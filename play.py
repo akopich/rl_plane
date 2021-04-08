@@ -5,7 +5,8 @@ from gym import Env
 import torch as T
 import logging
 
-from bomber_env.Memory import Transition, Memory
+from bomber_env.Memory import Memory
+from bomber_env.Transition import Transition
 
 Strategy = Callable[[T.Tensor], int]
 

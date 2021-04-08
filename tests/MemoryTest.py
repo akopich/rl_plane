@@ -1,6 +1,7 @@
 import unittest
 
-from bomber_env.Memory import ReplayMemory, Transition, MergedMemory
+from bomber_env.Memory import ReplayMemory, MergedMemory
+from bomber_env.Transition import Transition
 
 import torch as T
 

@@ -10,7 +10,8 @@ import torch as T
 import numpy as np
 
 from RandomStrategy import RandomStrategy
-from bomber_env.Memory import ReplayMemory, Transition, MergedMemory
+from bomber_env.Memory import ReplayMemory, MergedMemory
+from bomber_env.Transition import Transition
 from play import play, Strategy
 
 T.set_default_tensor_type(T.FloatTensor)
