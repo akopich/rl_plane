@@ -31,7 +31,7 @@ EPS_START = 0.9
 EPS_END = 0.00
 EPS_DECAY = 200
 TARGET_UPDATE = 10
-HIDDEN_N = 6
+HIDDEN_N = 10
 
 policy_net = nn.Sequential(nn.Linear(3, HIDDEN_N),
                            nn.ReLU(),
@@ -39,10 +39,15 @@ policy_net = nn.Sequential(nn.Linear(3, HIDDEN_N),
                            nn.ReLU(),
                            nn.Linear(HIDDEN_N, HIDDEN_N),
                            nn.ReLU(),
+                           nn.Dropout(p=0.05),
+                           nn.Linear(HIDDEN_N, HIDDEN_N),
+                           nn.ReLU(),
+                           nn.Linear(HIDDEN_N, HIDDEN_N),
+                           nn.ReLU(),
                            nn.Linear(HIDDEN_N, 2)
                            )
 
-optimizer = T.optim.Adam(policy_net.parameters(), lr=1e-4)
+optimizer = T.optim.Adam(policy_net.parameters(), lr=1e-2)
 memoryPositive = ReplayMemory(10000, lambda tr: tr.reward > 0)
 memoryNegative = ReplayMemory(10000, lambda tr: tr.reward < 0)
 memoryZero = ReplayMemory(10000, lambda tr: tr.reward == 0)
@@ -75,15 +80,29 @@ def optimize_model(history: TransitionHistory, optimize=True):
         logging.debug(f"Q-learning test loss: {loss.item()}")
 
 
-num_random = 50000
+num_random = 10000
 for i in range(num_random):
     strat = RandomStrategy()
     play(env, strat, memory)
 
-train, test = memory.split(0.8)
+memoryPositive2 = ReplayMemory(10000, lambda tr: tr.reward > 0)
+memoryNegative2 = ReplayMemory(10000, lambda tr: tr.reward < 0)
+memoryZero2 = ReplayMemory(10000, lambda tr: tr.reward == 0)
 
-for j in range(10000):
-    optimize_model(train.sample(BATCH_SIZE))
+memory2 = MergedMemory([memoryNegative2, memoryPositive2, memoryZero2])
 
-optimize_model(test.get(), optimize=False)
-print(np.array([play(env, net2strat(policy_net), log=True) for i in range(100)]).mean())
+for i in range(num_random):
+    strat = RandomStrategy()
+    play(env, strat, memory2)
+
+
+for j in range(10000+1):
+    optimize_model(memory.sample(BATCH_SIZE))
+    if j % 1000 == 0:
+        logging.info(f"ITER {j}")
+        optimize_model(memory.get(), optimize=False)
+        optimize_model(memory2.get(), optimize=False)
+        logging.info(np.array([play(env, net2strat(policy_net), log=False) for i in range(1000)]).mean())
+
+
+

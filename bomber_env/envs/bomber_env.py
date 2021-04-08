@@ -20,7 +20,7 @@ class BomberEnv(gym.Env):
         if action == 1:
             point_of_impact = self.plane_location + np.sqrt(2 * self.alt / self.g) * self.plane_speed
             distance = np.abs(point_of_impact - self.target_location)
-            if distance < 1000:
+            if distance < 500:
                 reward = 1.
             else:
                 reward = -1.
@@ -39,7 +39,7 @@ class BomberEnv(gym.Env):
         self.target_location = uniform(low=5000., high=15000.)
         self.plane_location = 0.
         self.plane_speed = uniform(low=100, high=250)
-        self.alt = 1000
+        self.alt = uniform(low=100, high=1500)
         self.dt = 1
 
     def render(self, mode='human'):
