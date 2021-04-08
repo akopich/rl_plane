@@ -12,6 +12,7 @@ import numpy as np
 from RandomStrategy import RandomStrategy
 from bomber_env.Memory import ReplayMemory, MergedMemory, Memory
 from bomber_env.Transition import Transition
+from bomber_env.TransitionHistory import TransitionHistory
 from play import play, Strategy
 
 T.set_default_tensor_type(T.FloatTensor)
@@ -51,13 +52,13 @@ memory = MergedMemory([memoryNegative, memoryPositive, memoryZero])
 env = gym.make('bomber-v0')
 
 
-def optimize_model(memory: Memory, optimize=True):
+def optimize_model(history: TransitionHistory, optimize=True):
     if len(memoryPositive) < 100:
         return
-    state, reward, action, has_next, next_state = memory.sample(BATCH_SIZE)
+    state, reward, action, has_next, next_state = history
 
     state_action_Q = policy_net(state).gather(1, action)
-    next_state_Q = T.zeros(BATCH_SIZE)
+    next_state_Q = T.zeros(len(history))
     next_state_Q[has_next] = policy_net(next_state[has_next]).max(1)[0].detach()
     expected_state_action_Q = (next_state_Q * GAMMA) + reward
 
@@ -74,7 +75,7 @@ def optimize_model(memory: Memory, optimize=True):
         logging.debug(f"Q-learning test loss: {loss.item()}")
 
 
-num_random = 5000
+num_random = 50000
 for i in range(num_random):
     strat = RandomStrategy()
     play(env, strat, memory)
@@ -82,7 +83,7 @@ for i in range(num_random):
 train, test = memory.split(0.8)
 
 for j in range(10000):
-    optimize_model(train)
+    optimize_model(train.sample(BATCH_SIZE))
 
-optimize_model(test, optimize=False)
+optimize_model(test.get(), optimize=False)
 print(np.array([play(env, net2strat(policy_net), log=True) for i in range(100)]).mean())

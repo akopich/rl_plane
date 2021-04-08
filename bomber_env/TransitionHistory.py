@@ -38,3 +38,6 @@ class TransitionHistory:
         else:
             self.has_next[index] = False
 
+    def __len__(self):
+        return self.state.size()[0]
+
