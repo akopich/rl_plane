@@ -65,10 +65,13 @@ class ReplayMemory(Memory):
         self.predicate = predicate
         self.state = T.zeros(capacity, STATE_WIDTH, dtype=T.float)
         self.next_state = T.zeros(capacity, STATE_WIDTH, dtype=T.float)
-        self.has_next_state = T.zeros(capacity, dtype=T.bool)
+        self.has_next = T.zeros(capacity, dtype=T.bool)
         self.reward = T.zeros(capacity)
         self.action = T.zeros(capacity, ACTION_WIDTH, dtype=T.int64)
         self.counter = 0
+
+    def _tensors(self):
+        return self.state, self.reward, self.action, self.has_next, self.next_state
 
     def push(self, transition: Transition):
         if not self.predicate(transition):
@@ -78,10 +81,10 @@ class ReplayMemory(Memory):
         self.reward[index] = transition.reward
         self.action[index, :] = transition.action
         if transition.next_state is not None:
-            self.has_next_state[index] = True
+            self.has_next[index] = True
             self.next_state[index, :] = transition.next_state
         else:
-            self.has_next_state[index] = False
+            self.has_next[index] = False
         self.counter += 1
 
     def sample(self, batch_size) -> TransitionHistory:
@@ -93,11 +96,7 @@ class ReplayMemory(Memory):
         return self.__get_by_index(T.tensor(range(len(self))))
 
     def __get_by_index(self, indx: T.Tensor) -> TransitionHistory:
-        return TransitionHistory(self.state[indx, :],
-                                 self.reward[indx],
-                                 self.action[indx, :],
-                                 self.has_next_state[indx],
-                                 self.next_state[indx, :])
+        return TransitionHistory(*[tensor[indx] for tensor in self._tensors()])
 
     def __len__(self):
         return self.capacity if self.counter >= self.capacity else self.counter
@@ -109,7 +108,6 @@ class MergedMemory(Memory):
 
     def get(self) -> TransitionHistory:
         samples = [list(iter(mem.get())) for mem in self.memories]
-
         return TransitionHistory(*[T.cat([sample[i] for sample in samples], 0) for i in range(5)])
 
     def push(self, tr):
