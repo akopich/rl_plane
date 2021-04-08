@@ -14,6 +14,7 @@ from bomber_env.Memory import ReplayMemory, MergedMemory, Memory
 from bomber_env.Transition import Transition
 from bomber_env.TransitionHistory import TransitionHistory
 from play import play, Strategy
+from joblib import Parallel, delayed
 
 T.set_default_tensor_type(T.FloatTensor)
 
@@ -48,18 +49,11 @@ policy_net = nn.Sequential(nn.Linear(3, HIDDEN_N),
                            )
 
 optimizer = T.optim.Adam(policy_net.parameters(), lr=1e-2)
-memoryPositive = ReplayMemory(10000, lambda tr: tr.reward > 0)
-memoryNegative = ReplayMemory(10000, lambda tr: tr.reward < 0)
-memoryZero = ReplayMemory(10000, lambda tr: tr.reward == 0)
-
-memory = MergedMemory([memoryNegative, memoryPositive, memoryZero])
 
 env = gym.make('bomber-v0')
 
 
 def optimize_model(history: TransitionHistory, optimize=True):
-    if len(memoryPositive) < 100:
-        return
     state, reward, action, has_next, next_state = history
 
     state_action_Q = policy_net(state).gather(1, action)
@@ -80,29 +74,40 @@ def optimize_model(history: TransitionHistory, optimize=True):
         logging.debug(f"Q-learning test loss: {loss.item()}")
 
 
-num_random = 10000
-for i in range(num_random):
-    strat = RandomStrategy()
-    play(env, strat, memory)
+def sample_random_games(iters) -> Memory:
+    memoryPositive = ReplayMemory(10000, lambda tr: tr.reward > 0)
+    memoryNegative = ReplayMemory(10000, lambda tr: tr.reward < 0)
+    memoryZero = ReplayMemory(10000, lambda tr: tr.reward == 0)
+    memory = MergedMemory([memoryNegative, memoryPositive, memoryZero])
 
-memoryPositive2 = ReplayMemory(10000, lambda tr: tr.reward > 0)
-memoryNegative2 = ReplayMemory(10000, lambda tr: tr.reward < 0)
-memoryZero2 = ReplayMemory(10000, lambda tr: tr.reward == 0)
+    for i in range(iters):
+        strat = RandomStrategy()
+        play(env, strat, memory)
 
-memory2 = MergedMemory([memoryNegative2, memoryPositive2, memoryZero2])
-
-for i in range(num_random):
-    strat = RandomStrategy()
-    play(env, strat, memory2)
+    return memory
 
 
-for j in range(10000+1):
-    optimize_model(memory.sample(BATCH_SIZE))
+def average_score(strat: Strategy) -> float:
+    def play_once(i):
+        return play(env, strat, log=False)
+
+    return np.array(Parallel(n_jobs=20)(delayed(play_once)(i) for i in range(1000))).mean()
+
+
+random_games_n = 10000
+train = sample_random_games(random_games_n)
+test = sample_random_games(random_games_n)
+
+
+train_iters_n = 10000+1
+for j in range(train_iters_n):
+    optimize_model(train.sample(BATCH_SIZE))
     if j % 1000 == 0:
         logging.info(f"ITER {j}")
-        optimize_model(memory.get(), optimize=False)
-        optimize_model(memory2.get(), optimize=False)
-        logging.info(np.array([play(env, net2strat(policy_net), log=False) for i in range(1000)]).mean())
+        optimize_model(train.get(), optimize=False)
+        optimize_model(test.get(), optimize=False)
+
+        logging.info(average_score(net2strat(policy_net)))
 
 
 
