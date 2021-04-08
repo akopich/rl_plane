@@ -88,7 +88,7 @@ class ReplayMemory(Memory):
         self.counter += 1
 
     def sample(self, batch_size) -> TransitionHistory:
-        n = self.capacity if self.counter >= self.capacity else self.counter
+        n = len(self)
         indx = T.randint(n, (batch_size,))
         return self.__get_by_index(indx)
 
