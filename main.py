@@ -10,7 +10,7 @@ import torch as T
 import numpy as np
 
 from RandomStrategy import RandomStrategy
-from bomber_env.Memory import ReplayMemory, MergedMemory
+from bomber_env.Memory import ReplayMemory, MergedMemory, Memory
 from bomber_env.Transition import Transition
 from play import play, Strategy
 
@@ -51,7 +51,7 @@ memory = MergedMemory([memoryNegative, memoryPositive, memoryZero])
 env = gym.make('bomber-v0')
 
 
-def optimize_model():
+def optimize_model(memory: Memory, optimize=True):
     if len(memoryPositive) < 100:
         return
     state, reward, action, has_next, next_state = memory.sample(BATCH_SIZE)
@@ -62,22 +62,27 @@ def optimize_model():
     expected_state_action_Q = (next_state_Q * GAMMA) + reward
 
     loss = F.mse_loss(state_action_Q, expected_state_action_Q.unsqueeze(1))
-    logging.debug(f"Q-training loss: {loss.item()}")
 
-    optimizer.zero_grad()
-    loss.backward()
-    for param in policy_net.parameters():
-        param.grad.data.clamp_(-1, 1)
-    optimizer.step()
+    if optimize:
+        logging.debug(f"Q-learning train loss: {loss.item()}")
+        optimizer.zero_grad()
+        loss.backward()
+        for param in policy_net.parameters():
+            param.grad.data.clamp_(-1, 1)
+        optimizer.step()
+    else:
+        logging.debug(f"Q-learning test loss: {loss.item()}")
 
 
-num_random = 50000
+num_random = 5000
 for i in range(num_random):
     strat = RandomStrategy()
     play(env, strat, memory)
 
+train, test = memory.split(0.8)
+
 for j in range(10000):
-    optimize_model()
+    optimize_model(train)
 
-
+optimize_model(test, optimize=False)
 print(np.array([play(env, net2strat(policy_net), log=True) for i in range(100)]).mean())

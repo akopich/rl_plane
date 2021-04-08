@@ -27,7 +27,7 @@ class Memory(Protocol):
 
 
 class ReplayMemory(Memory):
-    def __init__(self, capacity, predicate=lambda x: True, history = None):
+    def __init__(self, capacity, predicate=lambda x: True, history=None, counter=None):
         self.capacity = capacity
         self.predicate = predicate
         if history is None:
@@ -37,9 +37,10 @@ class ReplayMemory(Memory):
             reward = T.zeros(capacity)
             action = T.zeros(capacity, ACTION_WIDTH, dtype=T.int64)
             self.history = TransitionHistory(state, reward, action, has_next, next_state)
+            self.counter = 0
         else:
             self.history = history
-        self.counter = 0
+            self.counter = counter
 
     def push(self, transition: Transition):
         if not self.predicate(transition):
@@ -54,11 +55,18 @@ class ReplayMemory(Memory):
         return self.history[indx]
 
     def split(self, p: float) -> Tuple[Memory, Memory]:
-        indx = T.rand(len(self)) < p
-        hist1 = self.history[indx]
-        hist2 = self.history[T.logical_not(indx)]
-        hist2mem = lambda hist: ReplayMemory(self.capacity, predicate=self.predicate, history=self.history)
-        return hist2mem(hist1), hist2mem(hist2)
+        mask1 = T.zeros(self.capacity, dtype=T.bool)
+        mask2 = T.zeros(self.capacity, dtype=T.bool)
+        n = len(self)
+        indx = T.rand(n) < p
+        mask1[range(n)] = indx
+        mask2[range(n)] = T.logical_not(indx)
+
+        mask2mem = lambda mask: ReplayMemory(mask.sum().item(),
+                                             predicate=self.predicate,
+                                             history=self.history[mask],
+                                             counter=mask.sum().item())
+        return mask2mem(mask1), mask2mem(mask2)
 
     def get(self) -> TransitionHistory:
         return self.history
