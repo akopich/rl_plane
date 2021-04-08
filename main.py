@@ -99,15 +99,17 @@ train = sample_random_games(random_games_n)
 test = sample_random_games(random_games_n)
 
 
-train_iters_n = 10000+1
+train_iters_n = 4000+1
 for j in range(train_iters_n):
     optimize_model(train.sample(BATCH_SIZE))
     if j % 1000 == 0:
         logging.info(f"ITER {j}")
+
+        policy_net.eval()
         optimize_model(train.get(), optimize=False)
         optimize_model(test.get(), optimize=False)
-
         logging.info(average_score(net2strat(policy_net)))
+        policy_net.train()
 
 
 
