@@ -6,6 +6,8 @@ from numpy.random import uniform
 import numpy as np
 import torch as T
 
+from bomber_env.envs.Plane import Plane
+
 
 class BomberEnv(gym.Env):
     action_space = Discrete(2)
@@ -18,30 +20,32 @@ class BomberEnv(gym.Env):
 
     def step(self, action):
         if action == 1:
-            point_of_impact = self.plane_location + np.sqrt(2 * self.alt / self.g) * self.plane_speed
+            point_of_impact = self.plane.point_of_impact()
             distance = np.abs(point_of_impact - self.target_location)
             if distance < 500:
                 reward = 1.
             else:
                 reward = -1.
             return None, reward, True, {}
-        self.plane_location += self.dt * self.plane_speed
-        if self.plane_location > self.target_location:
+        self.plane.step()
+        if self.plane.location > self.target_location:
             return None, -1., True, {}
 
-        distance_to_target = self.target_location - self.plane_location
-        observation = T.tensor([distance_to_target, self.alt, self.plane_speed])
+        distance_to_target = self.target_location - self.plane.location
+        observation = T.tensor([distance_to_target, self.plane.altitude, self.plane.speed])
         return observation, 0, False, {}
 
     def reset(self):
         self.width = 15000.
-        self.g = 9.8
         self.target_location = uniform(low=5000., high=15000.)
-        self.plane_location = 0.
-        self.plane_speed = uniform(low=100, high=250)
-        self.alt = uniform(low=100, high=1500)
-        self.dt = 1
+
+        plane_location = 0.
+        plane_speed = uniform(low=100, high=250)
+        alt = uniform(low=100, high=1500)
+        dt = 1
+        g = 9.8
+        self.plane = Plane(plane_location, alt, plane_speed, dt, g)
 
     def render(self, mode='human'):
-        print(f"target_location={self.target_location}, plane_location={self.plane_location}, speed={self.plane_speed}, "
-              f"CCIP: {self.plane_location + np.sqrt(2 * self.alt / self.g) * self.plane_speed}")
+        print(f"target_location={self.target_location}, plane_location={self.plane.location}, speed={self.plane.speed}, "
+              f"CCIP: {self.plane.point_of_impact()}")
