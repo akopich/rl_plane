@@ -9,6 +9,7 @@ import random
 import torch as T
 import numpy as np
 
+from QLearning import QLearning
 from RandomStrategy import RandomStrategy
 from bomber_env.Memory import ReplayMemory, MergedMemory, Memory
 from bomber_env.Transition import Transition
@@ -27,51 +28,23 @@ def net2strat(net: nn.Module) -> Strategy:
 
 
 BATCH_SIZE = 1024
-GAMMA = 0.99999999
-EPS_START = 0.9
-EPS_END = 0.00
-EPS_DECAY = 200
-TARGET_UPDATE = 10
 HIDDEN_N = 10
 
-policy_net = nn.Sequential(nn.Linear(3, HIDDEN_N),
-                           nn.ReLU(),
-                           nn.Linear(HIDDEN_N, HIDDEN_N),
-                           nn.ReLU(),
-                           nn.Linear(HIDDEN_N, HIDDEN_N),
-                           nn.ReLU(),
-                           nn.Dropout(p=0.05),
-                           nn.Linear(HIDDEN_N, HIDDEN_N),
-                           nn.ReLU(),
-                           nn.Linear(HIDDEN_N, HIDDEN_N),
-                           nn.ReLU(),
-                           nn.Linear(HIDDEN_N, 2)
-                           )
-
-optimizer = T.optim.Adam(policy_net.parameters(), lr=1e-2)
+net = nn.Sequential(nn.Linear(3, HIDDEN_N),
+                    nn.ReLU(),
+                    nn.Linear(HIDDEN_N, HIDDEN_N),
+                    nn.ReLU(),
+                    nn.Linear(HIDDEN_N, HIDDEN_N),
+                    nn.ReLU(),
+                    nn.Dropout(p=0.05),
+                    nn.Linear(HIDDEN_N, HIDDEN_N),
+                    nn.ReLU(),
+                    nn.Linear(HIDDEN_N, HIDDEN_N),
+                    nn.ReLU(),
+                    nn.Linear(HIDDEN_N, 2)
+                    )
 
 env = gym.make('bomber-v0')
-
-
-def optimize_model(history: TransitionHistory, optimize=True):
-    state, reward, action, has_next, next_state = history
-
-    state_action_Q = policy_net(state).gather(1, action)
-    next_state_Q = T.zeros(len(history))
-    next_state_Q[has_next] = policy_net(next_state[has_next]).max(1)[0].detach()
-    expected_state_action_Q = (next_state_Q * GAMMA) + reward
-
-    loss = F.mse_loss(state_action_Q, expected_state_action_Q.unsqueeze(1))
-
-    if optimize:
-        logging.debug(f"Q-learning train loss: {loss.item()}")
-        optimizer.zero_grad()
-        loss.backward()
-        for param in policy_net.parameters():
-            param.grad.data.clamp_(-1, 1)
-        optimizer.step()
-    else:
-        logging.debug(f"Q-learning test loss: {loss.item()}")
 
 
 def sample_random_games(iters) -> Memory:
@@ -99,17 +72,18 @@ train = sample_random_games(random_games_n)
 test = sample_random_games(random_games_n)
 
 
+qlearning = QLearning(net, 1e-2, 0.99999)
+
 train_iters_n = 4000+1
 for j in range(train_iters_n):
-    optimize_model(train.sample(BATCH_SIZE))
+    qlearning.optimize(train.sample(BATCH_SIZE))
     if j % 1000 == 0:
         logging.info(f"ITER {j}")
 
-        policy_net.eval()
-        optimize_model(train.get(), optimize=False)
-        optimize_model(test.get(), optimize=False)
-        logging.info(average_score(net2strat(policy_net)))
-        policy_net.train()
+        net.eval()
+        logging.info(f"Train vs. test loss: {qlearning.get_loss(train.get())} vs. {qlearning.get_loss(test.get())}")
+        logging.info(average_score(net2strat(net)))
+        net.train()
 
 
 
