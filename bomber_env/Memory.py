@@ -5,7 +5,7 @@ import torch as T
 from bomber_env.Transition import Transition
 from bomber_env.TransitionHistory import TransitionHistory
 
-STATE_WIDTH = 3
+STATE_WIDTH = 4
 ACTION_WIDTH = 1
 
 

@@ -17,8 +17,8 @@ class QLearning:
 
         state_action_Q = self.net(state).gather(1, action)
         next_state_Q = T.zeros(len(history))
-        next_state_Q[has_next] = self.net(next_state[has_next]).max(1)[0].detach()
-        expected_state_action_Q = (next_state_Q * self.gamma) + reward
+        next_state_Q[has_next] = self.net(next_state[has_next]).max(1)[0]
+        expected_state_action_Q = next_state_Q * self.gamma + reward
 
         return F.mse_loss(state_action_Q, expected_state_action_Q.unsqueeze(1))
 
